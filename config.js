@@ -207,8 +207,8 @@ const WTW_CONFIG = {
   // Where the desktop builds come from. The GitHub API is key-less and
   // CORS-enabled, so the app can list the real release assets.
   repo: {
-    owner: 'gwallee',
-    name: 'What-The-Weather',
+    owner: 'OGAitherTech',
+    name: 'WhatTheWether',
     get url() { return `https://github.com/${this.owner}/${this.name}`; },
     get releasesUrl() { return `${this.url}/releases`; },
     get latestApi() { return `https://api.github.com/repos/${this.owner}/${this.name}/releases/latest`; },
@@ -313,3 +313,4 @@ const WTW_CONFIG = {
 
 // Expose globally (plain <script> loading, works from file:// too).
 window.WTW_CONFIG = WTW_CONFIG;
+

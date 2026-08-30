@@ -1,0 +1,23 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node / desktop packaging (only created if you build the desktop app)
+node_modules/
+dist/
+out/
+*.log
+
+# Playwright
+test-results/
+playwright-report/
+
+# Desktop build output
+desktop/dist/
+desktop/node_modules/
+squashfs-root/

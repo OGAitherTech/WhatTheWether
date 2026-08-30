@@ -1,0 +1,182 @@
+{
+  "name": "aither-weather",
+  "productName": "Aither Weather",
+  "version": "28.0.0",
+  "description": "Neon weather with a real-map radar, 48-hour outlook, and a local AI that roasts the forecast. No API keys.",
+  "author": {
+    "name": "gwallee",
+    "email": "gwallee@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:publish": "electron-builder --publish always"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.whatthewether.app",
+    "productName": "Aither Weather",
+    "copyright": "MIT licensed",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "app",
+        "filter": [
+          "index.html",
+          "styles.css",
+          "*.js",
+          "logo.svg",
+          "manifest.json",
+          "icons/**",
+          "assets/**",
+          "!node_modules/**",
+          "!tests/**",
+          "!desktop/**",
+          "!package.json"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aither Weather",
+      "artifactName": "AitherWeather-Setup-${version}.${ext}",
+      "uninstallDisplayName": "Aither Weather ${version}",
+      "differentialPackage": true
+    },
+    "portable": {
+      "artifactName": "AitherWeather-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility;Science",
+      "synopsis": "Neon weather with a real-map radar",
+      "desktop": {
+        "Name": "Aither Weather",
+        "Comment": "Neon weather with a real-map radar and a local roast AI",
+        "Categories": "Utility;Science;"
+      },
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "rpm",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "maintainer": "gwallee <gwallee@users.noreply.github.com>"
+    },
+    "appImage": {
+      "artifactName": "AitherWeather-${version}.${ext}"
+    },
+    "deb": {
+      "artifactName": "aither-weather_${version}_amd64.${ext}",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils"
+      ]
+    },
+    "rpm": {
+      "artifactName": "aither-weather-${version}.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.weather",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "artifactName": "AitherWeather-${version}-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gwallee",
+        "repo": "What-The-Weather",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "homepage": "https://github.com/gwallee/What-The-Weather",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gwallee/What-The-Weather.git"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9"
+  }
+}

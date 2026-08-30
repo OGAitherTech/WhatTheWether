@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="neon-dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0e17" />
+  <meta name="description" content="Aither Weather V28 — a neon weather app with a fullscreen animated radar over a real map, a 48-hour outlook, 7-day forecasts, alerts, favorites, themes, offline support, and a built-in local AI that roasts the weather. No API keys required." />
+  <title>Aither Weather V28 ⚡🌩️</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Aither Weather" />
+</head>
+<body>
+
+  <!-- The sky behind everything.
+
+       The colour comes from CSS keyed off data-sky / data-daynight on
+       the root element, so the page is the right colour before a
+       single frame is drawn and stays right with the animation
+       switched off. The canvas on top adds only the moving part. -->
+  <div class="sky-backdrop" id="skyBackdrop" data-scene="clear" aria-hidden="true">
+    <canvas id="skyCanvas"></canvas>
+  </div>
+
+
+  <!-- Gradients and shared shapes for the weather icons. Defined once:
+       a document with forty copies of the same gradient id has forty
+       ambiguous references. -->
+  <svg width="0" height="0" aria-hidden="true" focusable="false"
+       style="position:absolute" id="wtwIconDefs">
+    <defs>
+      <linearGradient id="wtwSunGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffe066" /><stop offset="100%" stop-color="#ff9f1c" />
+      </linearGradient>
+      <linearGradient id="wtwMoonGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f4f7ff" /><stop offset="100%" stop-color="#b9c6e8" />
+      </linearGradient>
+      <linearGradient id="wtwCloudGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffffff" /><stop offset="100%" stop-color="#c3ccdd" />
+      </linearGradient>
+      <linearGradient id="wtwCloudDarkGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#b9c2d4" /><stop offset="100%" stop-color="#7c879e" />
+      </linearGradient>
+      <linearGradient id="wtwRainGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7dd3fc" /><stop offset="100%" stop-color="#2b7fff" />
+      </linearGradient>
+      <linearGradient id="wtwSnowGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffffff" /><stop offset="100%" stop-color="#a5d8ff" />
+      </linearGradient>
+      <linearGradient id="wtwBoltGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffe066" /><stop offset="100%" stop-color="#f59f00" />
+      </linearGradient>
+
+      <symbol id="wtwCloud" viewBox="0 0 64 40" overflow="visible">
+        <path d="M46 38H19.5A11.5 11.5 0 0 1 17.8 15.2 16.4 16.4 0 0 1 48.4 12.6
+                 10.6 10.6 0 0 1 46 38Z" />
+      </symbol>
+      <symbol id="wtwSun" viewBox="0 0 40 40" overflow="visible">
+        <g stroke="url(#wtwSunGrad)" stroke-width="3" stroke-linecap="round">
+          <line x1="20" y1="1" x2="20" y2="6" /><line x1="20" y1="34" x2="20" y2="39" />
+          <line x1="1" y1="20" x2="6" y2="20" /><line x1="34" y1="20" x2="39" y2="20" />
+          <line x1="6.6" y1="6.6" x2="10.2" y2="10.2" />
+          <line x1="29.8" y1="29.8" x2="33.4" y2="33.4" />
+          <line x1="6.6" y1="33.4" x2="10.2" y2="29.8" />
+          <line x1="29.8" y1="10.2" x2="33.4" y2="6.6" />
+        </g>
+        <circle cx="20" cy="20" r="11" fill="url(#wtwSunGrad)" />
+      </symbol>
+      <symbol id="wtwMoon" viewBox="0 0 40 40" overflow="visible">
+        <path d="M28.5 25.5A14 14 0 0 1 14.5 8a1 1 0 0 0-1.4-1.1 15.5 15.5 0 1 0 20 20
+                 1 1 0 0 0-1.1-1.4 14 14 0 0 1-3.5 0Z" fill="url(#wtwMoonGrad)" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <a class="skip-link" href="#weatherPanels">Skip to weather</a>
+  <!-- Screen-reader announcements for asynchronous updates. -->
+  <div id="srAnnouncer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ================= Header ================= -->
+  <header class="app-header">
+    <div class="brand">
+      <img src="logo.svg" alt="Aither Weather logo" class="brand-logo" />
+      <div class="brand-text">
+        <h1>Aither Weather <span class="version-badge" id="appVersion">V13</span></h1>
+        <p class="brand-greeting">
+          <img class="brand-avatar" id="brandAvatar" alt="" width="20" height="20" hidden />
+          <span class="greeting-body" data-greeting hidden>Yo, <strong data-username></strong> ⚡</span>
+        </p>
+      </div>
+      <div class="sticky-weather" aria-hidden="true">
+        <span class="sticky-weather-city" id="stickyWxCity">—</span>
+        <span class="sticky-weather-temp" id="stickyWxTemp">--°</span>
+      </div>
+    </div>
+
+    <div class="header-tools" role="search">
+      <div class="tool-row">
+        <button type="button" id="searchBtn" class="btn btn-primary btn-compact"><span class="btn-ico" data-ui-icon="search"></span> Search</button>
+        <button type="button" id="geoBtn" class="btn btn-compact" title="Use my location" aria-label="Use my location"><span class="btn-ico" data-ui-icon="location"></span></button>
+        <button type="button" id="downloadBtn" class="btn btn-compact" title="Get the desktop app" aria-label="Get the desktop app"><span class="btn-ico" data-ui-icon="download"></span></button>
+        <button type="button" id="accountBtn" class="btn btn-compact" title="Sign in" aria-label="Sign in">
+          <img class="account-btn-avatar" id="accountBtnAvatar" alt="" width="20" height="20" hidden />
+          <span id="accountBtnIcon" class="btn-ico" data-ui-icon="account"></span>
+        </button>
+        <button type="button" id="settingsBtn" class="btn btn-compact" title="Settings" aria-label="Open settings"><span class="btn-ico" data-ui-icon="settings"></span></button>
+      </div>
+      <div class="search-field">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="City, place, or US ZIP…"
+          autocomplete="off"
+          role="combobox"
+          aria-expanded="false"
+          aria-controls="searchResults"
+          aria-autocomplete="list"
+          aria-label="Search for a city, place, or ZIP code"
+        />
+        <ul class="search-results" id="searchResults" role="listbox"
+            aria-label="Search results" hidden></ul>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= Welcome (first run) ================= -->
+  <section class="welcome-panel" id="welcomePanel" hidden>
+    <img src="logo.svg" alt="" class="welcome-logo" />
+    <h2><span data-greeting-welcome>Welcome!</span></h2>
+    <p>Search for a city or ZIP code, or use your location to get started.
+       Fair warning: the forecast comes with attitude.</p>
+    <div class="welcome-actions">
+      <button type="button" id="welcomeGeoBtn" class="btn btn-primary"><span class="btn-ico" data-ui-icon="location"></span> Use my location</button>
+      <button type="button" id="welcomeSearchBtn" class="btn"><span class="btn-ico" data-ui-icon="search"></span> Search a place</button>
+    </div>
+  </section>
+
+  <!-- ================= Main content ================= -->
+  <main class="app-main" id="weatherPanels" hidden>
+
+    <!-- Offline notice -->
+    <div class="offline-banner" id="offlineBanner" hidden>
+      <span class="btn-ico" data-ui-icon="offline" data-ui-size="15"></span> Offline — showing the last saved forecast.
+    </div>
+
+    <!-- Active NWS watches / warnings -->
+    <section class="alerts-panel" id="alertsPanel" aria-label="Active weather alerts" hidden></section>
+
+    <!-- Current weather -->
+    <!-- The hero sits on the sky itself rather than in a box.
+
+         Everything below it is a card; this is the one thing that is
+         not, because it is the sky's own weather and putting a border
+         round it makes the background look like wallpaper behind a
+         window instead of the thing being reported. -->
+    <section class="hero" id="hero" aria-label="Current conditions">
+      <div class="current-main">
+        <h2 class="hero-city" id="wxCity">—</h2>
+        <div class="wx-icon" id="wxIcon"></div>
+        <div class="wx-temp" id="wxTemp">--°</div>
+        <div class="wx-condition" id="wxCondition">Loading…</div>
+        <div class="wx-hilo-line" id="wxHiLoLine"></div>
+        <div class="wx-yesterday" id="wxYesterday" hidden></div>
+
+        <!-- Decoration, and only decoration: the sky doing what the
+             forecast says it is doing. Hidden from screen readers,
+             switched off by the Animated sky setting, and still when
+             the system asks for reduced motion. -->
+        <div class="wx-scene" id="wxScene" data-scene="clear" aria-hidden="true">
+          <canvas id="wxSceneCanvas"></canvas>
+        </div>
+
+        <div class="hero-actions">
+          <button type="button" id="saveFavBtn" class="btn btn-small"><span class="btn-ico" data-ui-icon="star" data-ui-size="15"></span> Save location</button>
+          <button type="button" id="refreshBtn" class="btn btn-small" title="Refresh weather"><span class="btn-ico" data-ui-icon="refresh" data-ui-size="15"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hourly outlook -->
+    <section class="card hourly-card" id="hourlyCard" aria-label="Hourly outlook">
+      <div class="card-head">
+        <h2 id="hourlyTitle"><span class="btn-ico" data-ui-icon="clock" data-ui-size="20"></span><span>Next 24 Hours</span></h2>
+        <span class="hourly-legend"><span class="legend-line"></span> temp <span class="legend-bar"></span> rain chance</span>
+      </div>
+      <!-- The row first, because it is what people actually read: the
+           next few hours at a glance, with sunrise and sunset dropped
+           in at the hour they happen. The chart underneath is for the
+           shape of the whole period, which a row cannot show. -->
+      <p class="hourly-summary" id="hourlySummary"></p>
+      <div class="hour-strip-wrap">
+        <ol class="hour-strip" id="hourStrip" aria-label="Hour by hour"></ol>
+      </div>
+      <div class="hourly-wrap">
+        <canvas id="hourlyCanvas" aria-label="Hourly temperature and precipitation chart"></canvas>
+      </div>
+    </section>
+
+    <!-- 7-day forecast -->
+    <section class="card forecast-card-panel" aria-label="7-day forecast">
+      <div class="card-head"><h2><span class="btn-ico" data-ui-icon="calendar" data-ui-size="20"></span> 7-Day Forecast</h2></div>
+      <div class="forecast-row" id="forecastRow"></div>
+    </section>
+
+    <section class="card current-card empty" id="currentCard" aria-label="Current weather detail">
+
+      <!-- The detail tiles.
+
+           One fact per tile, in the shape Apple's Weather made the
+           expectation: a quiet labelled header, the number large
+           enough to read at arm's length, and a sentence underneath
+           saying what the number means. The ids are the same ones the
+           flat stat rows used, so every reading of the app — and every
+           test — still points at the same element.
+
+           Order is roughly by how often somebody looks: what it feels
+           like and whether they will burn, then wind and rain, then
+           the rest. -->
+      <div class="tile-grid" id="tileGrid">
+
+        <article class="tile tile-action" data-tile="feels" data-metric="conditions" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="thermometer" data-ui-size="15"></span>Feels like</h3>
+          <p class="tile-value" id="wxFeels">--°</p>
+          <p class="tile-note" id="feelsNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="uv" data-metric="uv" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="sun" data-ui-size="15"></span>UV index</h3>
+          <p class="tile-value"><span id="wxUv">--</span></p>
+          <p class="tile-word" id="uvWord"></p>
+          <div class="tile-scale uv-scale" aria-hidden="true">
+            <span class="tile-scale-dot" id="uvDot"></span>
+          </div>
+          <p class="tile-note" id="uvNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="wind" data-metric="wind" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="wind" data-ui-size="15"></span>Wind</h3>
+          <dl class="wind-facts">
+            <div><dt>Wind</dt><dd id="wxWind">-- mph</dd></div>
+            <div><dt>Gusts</dt><dd id="wxGusts">--</dd></div>
+            <div><dt>Direction</dt><dd id="wxWindDir">--</dd></div>
+          </dl>
+          <div class="wind-dial" aria-hidden="true">
+            <svg viewBox="0 0 100 100" class="wind-dial-svg">
+              <circle cx="50" cy="50" r="40" class="wind-dial-ring" />
+              <text x="50" y="14" class="wind-dial-n">N</text>
+              <g id="windArrow" transform="rotate(0 50 50)">
+                <path d="M50 22 L56 40 L50 36 L44 40 Z" class="wind-dial-arrow" />
+              </g>
+            </svg>
+          </div>
+          <p class="tile-note" id="windNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="precip" data-metric="precip" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="droplet" data-ui-size="15"></span>Precipitation</h3>
+          <p class="tile-value" id="precipToday">--</p>
+          <p class="tile-word">Today</p>
+          <p class="tile-note" id="precipNote"></p>
+          <p class="tile-sub">Chance today: <span id="wxRain">--%</span></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="visibility" data-metric="visibility" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="eye" data-ui-size="15"></span>Visibility</h3>
+          <p class="tile-value" id="wxVisibility">--</p>
+          <p class="tile-note" id="visibilityNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="humidity" data-metric="humidity" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="humidity" data-ui-size="15"></span>Humidity</h3>
+          <p class="tile-value" id="wxHumidity">--%</p>
+          <p class="tile-note">The dew point is <span id="wxDew">--</span> right now.</p>
+        </article>
+
+        <article class="tile tile-action" data-tile="sun" data-sheet="sun" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="sunset" data-ui-size="15"></span>Sunset</h3>
+          <p class="tile-value" id="wxSunset">--</p>
+          <div class="sun-arc-wrap" aria-hidden="true">
+            <canvas id="sunArc"></canvas>
+          </div>
+          <p class="tile-note">Sunrise: <span id="wxSunrise">--</span></p>
+        </article>
+
+        <article class="tile tile-wide tile-action" data-tile="moon" id="moonTile" data-sheet="moon" role="button" tabindex="0" hidden>
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="moon" data-ui-size="15"></span><span id="moonName">Moon</span></h3>
+          <div class="moon-tile-body">
+            <dl class="moon-facts">
+              <div><dt>Illumination</dt><dd id="moonIllum">--</dd></div>
+              <div><dt>Moon age</dt><dd id="moonPhaseAge">--</dd></div>
+              <div><dt>Next full moon</dt><dd id="moonNextFull">--</dd></div>
+            </dl>
+            <div class="moon-disc-wrap" aria-hidden="true"><canvas id="moonDisc"></canvas></div>
+          </div>
+        </article>
+
+        <article class="tile tile-wide tile-action" data-tile="aqi" id="aqiTile" data-sheet="aqi" role="button" tabindex="0" hidden>
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="aqi" data-ui-size="15"></span>Air quality</h3>
+          <p class="tile-value"><span id="aqiBadge" class="aqi-badge aqi-none">--</span></p>
+          <p class="tile-word" id="aqiLabel">--</p>
+          <div class="tile-scale aqi-scale" aria-hidden="true">
+            <span class="tile-scale-dot" id="aqiDot" hidden></span>
+          </div>
+          <p class="tile-note" id="aqiAdvice"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="averages" id="averagesTile" data-sheet="averages" role="button" tabindex="0" hidden>
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="chart" data-ui-size="15"></span>Averages</h3>
+          <p class="tile-value" id="avgDelta">--</p>
+          <p class="tile-word" id="avgWord"></p>
+          <dl class="avg-facts">
+            <div><dt>Today</dt><dd id="avgToday">--</dd></div>
+            <div><dt>Average</dt><dd id="avgNormal">--</dd></div>
+          </dl>
+          <p class="tile-note" id="avgNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="hilo" id="wxHiLoStat"
+                 role="button" tabindex="0"
+                 title="Tap for the temperature trend"
+                 aria-label="High and low temperature. Activate for the temperature trend chart.">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="chart" data-ui-size="15"></span>High / Low</h3>
+          <p class="tile-value" id="wxHiLo">--° / --°</p>
+          <p class="tile-note" id="hiLoNote"></p>
+        </article>
+
+        <article class="tile tile-action" data-tile="pressure" data-metric="pressure" role="button" tabindex="0">
+          <h3 class="tile-head"><span class="btn-ico" data-ui-icon="gauge" data-ui-size="15"></span>Pressure</h3>
+          <div class="pressure-dial" aria-hidden="true">
+            <canvas id="pressureDial"></canvas>
+          </div>
+          <p class="tile-value tile-value-dial" id="wxPressure">--</p>
+          <!-- The dial is a picture and aria-hidden, so the trend it
+               draws has to exist as words too or it is only available
+               to people who can see it. -->
+          <p class="tile-sub" id="pressureTrend"></p>
+          <p class="tile-scale-ends" aria-hidden="true"><span>Low</span><span>High</span></p>
+        </article>
+
+      </div>
+      <div class="nowcast-panel" id="nowcastPanel" hidden>
+        <div class="nowcast-head">
+          <span class="nowcast-icon" id="nowcastIcon"><span class="btn-ico" data-ui-icon="hourglass" data-ui-size="16"></span></span>
+          <span class="nowcast-text" id="nowcastText"></span>
+        </div>
+        <div class="nowcast-strip-wrap"><canvas id="nowcastStrip" aria-label="Precipitation over the next two hours"></canvas></div>
+        <div class="nowcast-precision" id="nowcastPrecision"></div>
+      </div>
+
+      <div class="wx-updated" id="wxUpdated"></div>
+
+      <!-- Where this forecast is actually for. A city name is not a
+           place: two towns share one, and a geolocated fix lands on
+           coordinates rather than an address. Saying the coordinates
+           and offering a map is how somebody checks. -->
+      <div class="place-footer" id="placeFooter" hidden>
+        <div class="place-lines">
+          <strong id="placeName">—</strong>
+          <span class="place-coords" id="placeCoords"></span>
+        </div>
+        <a class="btn btn-small" id="openInMaps" target="_blank" rel="noopener noreferrer" href="#">
+          <span class="btn-ico" data-ui-icon="map" data-ui-size="15"></span> Open in Maps
+        </a>
+      </div>
+
+      <!-- Built-in roast: part of the weather card, not a separate panel -->
+      <div class="roast-inline">
+        <div class="roast-head">
+          <span class="roast-label"><span class="btn-ico" data-ui-icon="bot" data-ui-size="16"></span> Wether Bot</span>
+          <span class="roast-meta">
+            <span class="roast-context" id="roastContext">Right now</span>
+            <span class="roast-personality" id="roastPersonality"></span>
+            <span class="roast-brain" id="botBadge" hidden></span>
+          </span>
+        </div>
+        <p class="roast-text" id="roastText">Load some weather and I'll tell you what I really think.</p>
+        <div class="roast-actions">
+          <button type="button" id="roastBtn" class="btn btn-primary"><span class="btn-ico" data-ui-icon="flame"></span> Roast me again</button>
+          <button type="button" id="shareRoastBtn" class="btn" title="Save or share this roast as an image"><span class="btn-ico" data-ui-icon="share"></span> Share</button>
+        </div>
+        <button type="button" id="roastLogToggle" class="roast-log-toggle" aria-expanded="false">▸ Roast history</button>
+        <div class="roast-log-panel" id="roastLogPanel" hidden>
+          <ul class="roast-log-list" id="roastLogList"></ul>
+        </div>
+        <p class="roast-note">100% local AI — no API key, no cloud, no mercy. Tap any forecast day for its own roast.</p>
+      </div>
+    </section>
+
+    <!-- Radar -->
+    <section class="card radar-card" id="radarCard" aria-label="Animated radar">
+      <div class="card-head">
+        <h2><span class="btn-ico" data-ui-icon="radar" data-ui-size="20"></span> Live Radar</h2>
+        <div class="radar-status">
+          <!-- The dot carries the state; the words are for a screen
+               reader, which cannot see a green dot. Printing STANDBY
+               and SIMULATED across the top of a weather map is telling
+               people about the machinery instead of the weather. -->
+          <span class="status-dot" id="radarStatusDot" title="Radar state"></span>
+          <span id="radarStatusText" class="sr-only">STANDBY</span>
+          <span class="radar-source" id="radarSource" title="Radar data source" hidden>SIMULATED</span>
+          <button type="button" id="radarFullscreenBtn" class="btn btn-small radar-fs-btn"
+                  aria-pressed="false"><span class="btn-ico" data-ui-icon="expand" data-ui-size="15"></span> Fullscreen</button>
+        </div>
+      </div>
+
+      <div class="radar-wrap">
+        <canvas id="radarCanvas" title="Tap the scope for fullscreen"
+                aria-label="Animated weather radar display. Activate for fullscreen."
+                role="button" tabindex="0"></canvas>
+        <div class="radar-location" id="radarLocationLabel">No location</div>
+      </div>
+
+      <!-- The legend, with the bands named rather than just its ends.
+           "Light … Heavy" tells you the bar goes up; naming the middle
+           tells you what the green you are actually looking at is. -->
+      <div class="radar-legend" id="radarLegend"
+           aria-label="Precipitation intensity scale">
+        <span class="legend-bar" aria-hidden="true"></span>
+        <div class="legend-stops" aria-hidden="true">
+          <span>Light</span><span>Moderate</span><span>Heavy</span><span>Intense</span>
+        </div>
+      </div>
+
+      <!-- One clock, not three. The slider had a caption at each end,
+           a relation label ("NOW", "+20 min") and a wall-clock chip —
+           four pieces of text for one number. The captions stay as the
+           slider's own bounds; the relation and the time are one chip. -->
+      <div class="radar-timeline">
+        <span class="timeline-caption" id="radarTimelineStart">-60 min</span>
+        <input type="range" id="radarTimeline" min="0" max="60" value="60" step="1" aria-label="Radar timeline" />
+        <span class="timeline-caption timeline-end" id="radarTimelineEnd">now</span>
+        <span class="timeline-label" id="radarTimeLabel">NOW</span>
+        <span class="frame-clock" id="radarFrameClock" hidden></span>
+      </div>
+
+      <div class="radar-controls">
+        <button type="button" id="radarStepBack" class="btn btn-small"
+                title="Previous frame" aria-label="Previous frame"><span class="btn-ico" data-ui-icon="stepBack" data-ui-size="15"></span></button>
+        <button type="button" id="radarPlayBtn" class="btn" aria-pressed="true"><span class="btn-ico" data-ui-icon="pause"></span> Pause</button>
+        <button type="button" id="radarStepFwd" class="btn btn-small"
+                title="Next frame" aria-label="Next frame"><span class="btn-ico" data-ui-icon="stepFwd" data-ui-size="15"></span></button>
+        <button type="button" id="radarStopBtn" class="btn"><span class="btn-ico" data-ui-icon="stop"></span> Stop</button>
+        <button type="button" id="radarRefreshBtn" class="btn"><span class="btn-ico" data-ui-icon="refresh"></span> Refresh</button>
+        <button type="button" id="radarLocateBtn" class="btn"><span class="btn-ico" data-ui-icon="location"></span> My Location</button>
+      </div>
+      <div class="radar-controls radar-zoom-row">
+        <button type="button" id="radarZoomOut" class="btn btn-small" aria-label="Zoom out"><span class="btn-ico" data-ui-icon="minus" data-ui-size="15"></span></button>
+        <span class="radar-range" id="radarRange">150 km</span>
+        <button type="button" id="radarZoomIn" class="btn btn-small" aria-label="Zoom in"><span class="btn-ico" data-ui-icon="plus" data-ui-size="15"></span></button>
+        <button type="button" id="radarRecenter" class="btn btn-small"><span class="btn-ico" data-ui-icon="target" data-ui-size="15"></span> Recenter</button>
+      </div>
+      <div class="radar-sliders">
+        <label class="radar-slider" for="radarOpacity">
+          <span>Rain opacity</span>
+          <input type="range" id="radarOpacity" min="0.2" max="1" step="0.05" value="0.85" />
+          <output id="radarOpacityOut">85%</output>
+        </label>
+        <label class="radar-slider" for="radarSpeed">
+          <span>Loop speed</span>
+          <input type="range" id="radarSpeed" min="0.25" max="4" step="0.25" value="1" />
+          <output id="radarSpeedOut">1×</output>
+        </label>
+      </div>
+      <p class="radar-attribution">Drag to pan · arrow keys step a frame · tap for fullscreen.
+        <span class="radar-credit">Basemap © OpenStreetMap contributors © CARTO. Precipitation © RainViewer.</span></p>
+    </section>
+
+    <!-- Air & sky -->
+    <section class="card air-card" id="airCard" aria-label="Air quality and sky" hidden>
+      <div class="card-head"><h2><span class="btn-ico" data-ui-icon="aqi" data-ui-size="20"></span> Air &amp; Sky</h2></div>
+
+      <div class="air-grid">
+        <div class="detail"><span class="detail-label">PM2.5</span><span class="detail-value" id="aqPm25">--</span></div>
+        <div class="detail"><span class="detail-label">PM10</span><span class="detail-value" id="aqPm10">--</span></div>
+        <div class="detail"><span class="detail-label">Ozone</span><span class="detail-value" id="aqOzone">--</span></div>
+        <div class="detail"><span class="detail-label">NO₂</span><span class="detail-value" id="aqNo2">--</span></div>
+        <div class="detail" id="pollenRow" hidden><span class="detail-label">Pollen</span><span class="detail-value" id="pollenValue">--</span></div>
+      </div>
+
+      <div class="sky-row">
+        <div class="detail"><span class="detail-label">Daylight</span><span class="detail-value" id="skyDaylight">--</span></div>
+        <div class="detail"><span class="detail-label">Solar noon</span><span class="detail-value" id="skySolarNoon">--</span></div>
+      </div>
+    </section>
+
+    <!-- Compare saved locations -->
+    <section class="card compare-card" id="comparePanel" aria-label="Compare saved locations">
+      <div class="card-head">
+        <h2><span class="btn-ico" data-ui-icon="map" data-ui-size="20"></span> Your Locations</h2>
+        <button type="button" id="compareRefreshBtn" class="btn btn-small"><span class="btn-ico" data-ui-icon="refresh" data-ui-size="15"></span> Refresh</button>
+      </div>
+      <p class="compare-empty" id="compareEmpty">Save a few locations and they'll line up here side by side.</p>
+      <div class="compare-grid" id="compareGrid"></div>
+    </section>
+
+    <!-- Favorites -->
+    <section class="card favorites-card" aria-label="Favorite locations">
+      <div class="card-head"><h2><span class="btn-ico" data-ui-icon="star" data-ui-size="20"></span> Favorites</h2></div>
+      <p class="favorites-empty" id="favoritesEmpty">No favorites yet. Load a place and hit “Save location”.</p>
+      <ul class="favorites-list" id="favoritesList"></ul>
+    </section>
+
+  </main>
+
+  <!-- ================= Settings ================= -->
+  <div class="settings-overlay" id="settingsOverlay" hidden></div>
+  <aside class="settings-panel" id="settingsPanel" aria-label="Settings">
+    <div class="settings-head">
+      <h2><span class="btn-ico" data-ui-icon="settings" data-ui-size="20"></span> Settings</h2>
+      <button type="button" id="settingsCloseBtn" class="btn btn-small" aria-label="Close settings"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    </div>
+
+    <div class="setting-group" id="accountGroup">
+      <label>Account</label>
+
+      <!-- Signed out, the panel offers the two ways in and says nothing
+           about the state you are in meanwhile: nothing is locked, so
+           there is nothing to explain. Each provider's SDK is fetched
+           only when this panel is actually opened. -->
+      <div class="account-signed-out" id="accountSignedOut">
+        <p class="account-lead" id="accountLead">Sign in to put your name and picture on the app.</p>
+        <button type="button" id="settingsSignInBtn" class="btn btn-primary btn-small">Sign in</button>
+      </div>
+
+      <div class="account-signed-in" id="accountSignedIn" hidden>
+        <img class="account-avatar" id="accountAvatar" alt="" width="36" height="36" hidden />
+        <span class="account-initial" id="accountInitial" aria-hidden="true" hidden></span>
+        <div class="account-meta">
+          <span class="account-name" id="accountName"></span>
+          <span class="account-email" id="accountEmail"></span>
+        </div>
+        <button type="button" id="signOutBtn" class="btn btn-small">Log out</button>
+      </div>
+
+      <p class="setting-hint" id="accountHint"></p>
+    </div>
+
+    <div class="setting-group" id="transferGroup">
+      <label>Move to another device</label>
+      <p class="setting-hint">Your account, saved places and settings live in this
+        browser. This code carries them to another device — no server, no account
+        anywhere else. It holds no password and no sign-in token.</p>
+      <div class="setting-row">
+        <button type="button" id="transferShowBtn" class="btn btn-small">Show my code</button>
+        <button type="button" id="transferCopyBtn" class="btn btn-small" hidden>Copy</button>
+      </div>
+      <textarea id="transferCode" class="transfer-code" rows="3" readonly hidden
+                aria-label="Your transfer code"></textarea>
+
+      <div class="setting-row transfer-restore">
+        <input type="text" id="transferInput" autocomplete="off" spellcheck="false"
+               placeholder="Paste a code from another device" />
+        <button type="button" id="transferRestoreBtn" class="btn btn-primary btn-small">Restore</button>
+      </div>
+      <p class="setting-hint" id="transferStatus"></p>
+    </div>
+
+    <!-- Switching a provider on without a deploy. The IDs are public
+         values, not secrets, and this stores them on this device only —
+         which the hint says plainly, because pasting one here does not
+         give it to anybody else who visits. -->
+    <div class="setting-group" id="authSetupGroup">
+      <label>Sign-in providers</label>
+      <p class="setting-hint">Paste a client ID to switch a provider on. Kept on
+        this device — to offer it to everyone who visits, put the same ID in
+        <code>config.js</code>. Setup steps for all three are in the README.</p>
+
+      <div class="provider-row">
+        <label for="googleIdInput">Google client ID</label>
+        <div class="setting-row">
+          <input type="text" id="googleIdInput" autocomplete="off" spellcheck="false"
+                 placeholder="…apps.googleusercontent.com" />
+          <button type="button" id="googleIdSave" class="btn btn-small">Save</button>
+        </div>
+      </div>
+
+      <div class="provider-row">
+        <label for="microsoftIdInput">Microsoft client ID</label>
+        <div class="setting-row">
+          <input type="text" id="microsoftIdInput" autocomplete="off" spellcheck="false"
+                 placeholder="Application (client) ID" />
+          <button type="button" id="microsoftIdSave" class="btn btn-small">Save</button>
+        </div>
+      </div>
+
+      <div class="provider-row">
+        <label for="appleIdInput">Apple Services ID</label>
+        <div class="setting-row">
+          <input type="text" id="appleIdInput" autocomplete="off" spellcheck="false"
+                 placeholder="com.example.app.web" />
+          <button type="button" id="appleIdSave" class="btn btn-small">Save</button>
+        </div>
+      </div>
+
+      <p class="setting-hint" id="authSetupStatus"></p>
+    </div>
+
+    <div class="setting-group">
+      <label for="usernameInput">Username</label>
+      <div class="setting-row">
+        <input type="text" id="usernameInput" maxlength="24" autocomplete="off" />
+        <button type="button" id="usernameSaveBtn" class="btn btn-primary btn-small">Save</button>
+      </div>
+      <p class="setting-hint">Shown across the app. The bot will use it against you.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="personalitySelect">AI personality</label>
+      <select id="personalitySelect"></select>
+      <p class="setting-hint">Friendly → Brutal. Choose your pain level.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="botBrainSelect">Wether Bot brain</label>
+      <select id="botBrainSelect"></select>
+      <p class="setting-hint">Built-in works with no key, no account and no network.
+        Gemini writes its lines with Google's model, using a key you provide.</p>
+    </div>
+
+    <div class="setting-group" id="geminiGroup" hidden>
+      <label for="geminiKeyInput">Google Gemini API key</label>
+      <div class="setting-row">
+        <input type="password" id="geminiKeyInput" autocomplete="off"
+               spellcheck="false" placeholder="Paste your key" />
+        <button type="button" id="geminiSaveBtn" class="btn btn-small">Save</button>
+      </div>
+      <div class="setting-row">
+        <button type="button" id="geminiTestBtn" class="btn btn-small">Test the key</button>
+        <button type="button" id="geminiClearBtn" class="btn btn-small">Forget it</button>
+      </div>
+      <p class="setting-status" id="geminiStatus" role="status"></p>
+
+      <label for="geminiModelSelect">Model</label>
+      <select id="geminiModelSelect"></select>
+      <p class="setting-hint">Flash Lite writes a one-liner in a couple of dozen
+        tokens. The thinking models spend hundreds of tokens of your quota
+        reasoning about a joke first, and are slower for it.</p>
+
+      <!-- Said here rather than left to be discovered. A key in a
+           browser is readable by anyone who can open devtools on that
+           browser; what it is not is shared with other visitors. -->
+      <p class="setting-hint setting-warn">
+        The key is kept in <strong>this browser only</strong> and sent nowhere
+        except Google. It is never part of the app's code, so publishing this
+        site does not publish your key — but anyone who can open developer
+        tools on this browser can read it. Use a key you are willing to rotate,
+        and <a href="https://aistudio.google.com/apikey" target="_blank"
+        rel="noopener noreferrer">revoke it</a> if you ever paste it somewhere
+        public. Google bills this key for what the bot uses.
+      </p>
+    </div>
+
+    <div class="setting-group">
+      <label class="toggle-row" for="showRoastToggle">
+        <span>Show the Wether Bot</span>
+        <input type="checkbox" id="showRoastToggle" />
+      </label>
+      <p class="setting-hint">Off hides the bot entirely — no panel, no roasts, no
+        history. The weather is still the weather.</p>
+    </div>
+
+    <div class="setting-group" id="autoRoastGroup">
+      <label class="toggle-row" for="autoRoastToggle">
+        <span>Automatic weather roasts</span>
+        <input type="checkbox" id="autoRoastToggle" />
+      </label>
+    </div>
+
+    <!-- Desktop only. Removed entirely in a browser: a panel of
+         switches that do nothing is worse than no panel. -->
+    <div class="setting-group desktop-panel" id="desktopPanel" hidden>
+      <h3 class="setting-subhead">Desktop app
+        <span class="desktop-version">v<span id="desktopVersion">—</span></span></h3>
+
+      <div class="desktop-update">
+        <div id="desktopUpdate">
+          <p class="setting-status" id="desktopUpdateStatus"></p>
+          <div class="update-bar" id="desktopUpdateBar" hidden><span></span></div>
+        </div>
+        <button type="button" id="desktopUpdateBtn" class="btn btn-small">Check for updates</button>
+      </div>
+      <p class="setting-hint">Updates come from this project's GitHub releases.
+        Nothing downloads until you say so.</p>
+
+      <label class="toggle-row" for="deskAutoUpdate">
+        <span>Check for updates on launch</span>
+        <input type="checkbox" id="deskAutoUpdate" />
+      </label>
+      <label class="toggle-row" for="deskTrayWeather">
+        <span>Show the temperature in the tray</span>
+        <input type="checkbox" id="deskTrayWeather" />
+      </label>
+      <label class="toggle-row" for="deskLaunchAtLogin">
+        <span>Launch at login</span>
+        <input type="checkbox" id="deskLaunchAtLogin" />
+      </label>
+      <label class="toggle-row" for="deskAlwaysOnTop">
+        <span>Keep the window on top</span>
+        <input type="checkbox" id="deskAlwaysOnTop" />
+      </label>
+      <label class="toggle-row" for="deskMinimiseToTray">
+        <span>Close to the tray instead of quitting</span>
+        <input type="checkbox" id="deskMinimiseToTray" />
+      </label>
+      <p class="setting-hint">Severe weather alerts arrive as system notifications,
+        whether or not the window is open.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="radarStyleSelect">Radar style</label>
+      <select id="radarStyleSelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label for="backgroundSelect">Background</label>
+      <select id="backgroundSelect"></select>
+      <p class="setting-hint">The page takes the colour of the sky outside. Turn it
+        down to colours only, or off for the plain theme.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="cardStyleSelect">Card style</label>
+      <select id="cardStyleSelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label for="cornersSelect">Corners</label>
+      <select id="cornersSelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label for="densitySelect">Spacing</label>
+      <select id="densitySelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label class="toggle-row" for="sceneToggle">
+        <span>Animated sky under the weather</span>
+        <input type="checkbox" id="sceneToggle" />
+      </label>
+      <p class="setting-hint">Rain falls, snow drifts, storms flash. Off here, and
+        off automatically if your system asks for reduced motion.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="iconStyleSelect">Weather icons</label>
+      <select id="iconStyleSelect"></select>
+      <p class="setting-hint">Rendered icons are drawn by the app and look the same
+        on every device. Emoji look like whatever your device draws them as.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="accentSelect">Accent colour</label>
+      <select id="accentSelect"></select>
+      <div class="accent-preview" id="accentPreview" aria-hidden="true"></div>
+      <p class="setting-hint">Colours the radar, charts, buttons and highlights.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="forecastDaysSelect">Days in the forecast</label>
+      <select id="forecastDaysSelect"></select>
+      <p class="setting-hint">Changing this reloads the forecast.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="hourlyHoursSelect">Hours in the outlook</label>
+      <select id="hourlyHoursSelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label for="unitsSelect">Units</label>
+      <select id="unitsSelect"></select>
+      <p class="setting-hint">Applies everywhere — cards, chart, radar rings, even the roasts.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="clockSelect">Clock</label>
+      <select id="clockSelect">
+        <option value="12">12-hour</option>
+        <option value="24">24-hour</option>
+      </select>
+    </div>
+
+    <div class="setting-group">
+      <label class="toggle-row" for="alertNotifyToggle">
+        <span>Notify me of severe alerts</span>
+        <input type="checkbox" id="alertNotifyToggle" />
+      </label>
+      <p class="setting-hint">Browser notifications, only while the app is open. Needs permission.</p>
+    </div>
+
+    <div class="setting-group">
+      <label for="themeSelect">Theme</label>
+      <select id="themeSelect"></select>
+    </div>
+
+    <div class="setting-group">
+      <label>Roast history</label>
+      <button type="button" id="clearRoastLogBtn" class="btn btn-small"><span class="btn-ico" data-ui-icon="trash" data-ui-size="15"></span> Clear roast history</button>
+    </div>
+
+    <div class="setting-group">
+      <label>Desktop app</label>
+      <button type="button" id="settingsDownloadBtn" class="btn btn-small"><span class="btn-ico" data-ui-icon="download" data-ui-size="15"></span> Download for Windows, macOS or Linux</button>
+      <p class="setting-hint">Installs the same app locally, with a shortcut and its own icon.</p>
+    </div>
+
+    <div class="setting-group">
+      <label>App version</label>
+      <div class="setting-row">
+        <span class="version-readout" id="versionReadout">—</span>
+        <button type="button" id="forceUpdateBtn" class="btn btn-small"><span class="btn-ico" data-ui-icon="refresh" data-ui-size="15"></span> Force update</button>
+      </div>
+      <p class="setting-hint">Clears the offline cache and reloads from the server. Use this if the app looks out of date.</p>
+    </div>
+
+    <p class="settings-footnote">Everything is stored locally in your browser. No accounts, no API keys.</p>
+  </aside>
+
+  <!-- ================= Desktop downloads ================= -->
+  <div class="modal-overlay" id="downloadOverlay" hidden></div>
+  <div class="download-modal" id="downloadModal" role="dialog" aria-modal="true"
+       aria-labelledby="downloadTitle" hidden>
+    <div class="temp-modal-head">
+      <div>
+        <h2 id="downloadTitle"><span class="btn-ico" data-ui-icon="download" data-ui-size="20"></span> Get the Desktop App</h2>
+        <p class="temp-modal-summary">Same app, installed on your machine. No API keys.</p>
+      </div>
+      <button type="button" id="downloadClose" class="btn btn-small" aria-label="Close downloads"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    </div>
+    <div class="dl-body" id="downloadBody"></div>
+  </div>
+
+  <!-- ================= Sign in ================= -->
+  <div class="modal-overlay" id="signInOverlay" hidden></div>
+  <div class="signin-modal" id="signInModal" role="dialog" aria-modal="true"
+       aria-labelledby="signInTitle" tabindex="-1" hidden>
+    <button type="button" id="signInClose" class="signin-close btn btn-small"
+            aria-label="Close sign in"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    <img class="signin-logo" src="logo.svg" alt="" width="56" height="56" />
+    <h2 id="signInTitle">Sign in to Aither Weather</h2>
+    <p class="signin-sub" id="signInSub">Use an account you already have. It sets
+      your name and picture across the app — nothing else changes.</p>
+
+    <div class="signin-buttons" id="signInButtons">
+      <div id="googleButtonHost" hidden></div>
+      <button type="button" id="microsoftBtn" class="btn signin-btn ms-btn" hidden>
+        <span class="ms-logo" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false">
+            <rect x="1"  y="1"  width="8" height="8" fill="#f25022" />
+            <rect x="11" y="1"  width="8" height="8" fill="#7fba00" />
+            <rect x="1"  y="11" width="8" height="8" fill="#00a4ef" />
+            <rect x="11" y="11" width="8" height="8" fill="#ffb900" />
+          </svg>
+        </span>
+        <span>Sign in with Microsoft</span>
+      </button>
+      <button type="button" id="appleBtn" class="btn signin-btn apple-btn" hidden>
+        <span class="apple-logo" aria-hidden="true">
+          <svg viewBox="0 0 16 20" width="16" height="19" focusable="false" fill="currentColor">
+            <path d="M13.2 10.6c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.7-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.7-2.7-.7-1.4 0-2.7.8-3.4 2.1-1.4 2.5-.4 6.2 1 8.3.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.6 1.1 0 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.3s-2.1-.8-2.2-3.3zM11.1 4.2c.6-.7 1-1.7.9-2.7-.8 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6.9.1 1.9-.5 2.5-1.2z"/>
+          </svg>
+        </span>
+        <span>Sign in with Apple</span>
+      </button>
+    </div>
+
+    <div class="signin-or" id="signInOr" hidden><span>or</span></div>
+
+    <form class="signin-local" id="localSignInForm">
+      <label for="localNameInput">Create your account</label>
+      <div class="setting-row">
+        <input type="text" id="localNameInput" maxlength="24" autocomplete="nickname"
+               placeholder="Type a name" />
+        <button type="submit" id="localSignInBtn" class="btn btn-primary btn-small">Create</button>
+      </div>
+      <div class="avatar-picker" id="avatarPicker" role="radiogroup"
+           aria-label="Pick a picture for your account"></div>
+      <p class="signin-local-note">No password, no email, nothing to set up. Your
+        account lives on this device — Settings can move it to another one.</p>
+    </form>
+
+    <p class="auth-note" id="signInNote" hidden></p>
+
+    <button type="button" id="signInDismiss" class="btn btn-small btn-plain">Not now</button>
+    <p class="signin-fine">Nothing is synced: your favourites and settings stay on
+      this device.</p>
+  </div>
+
+  <!-- ================= Temperature trend ================= -->
+  <div class="modal-overlay" id="tempModalOverlay" hidden></div>
+  <div class="temp-modal" id="tempModal" role="dialog" aria-modal="true"
+       aria-labelledby="tempModalTitle" hidden>
+    <div class="temp-modal-head">
+      <div>
+        <h2 id="tempModalTitle"><span class="btn-ico" data-ui-icon="chart" data-ui-size="20"></span> Temperature Trend</h2>
+        <p class="temp-modal-summary" id="tempModalSummary"></p>
+      </div>
+      <button type="button" id="tempModalClose" class="btn btn-small" aria-label="Close chart"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    </div>
+    <div class="temp-chart-wrap">
+      <canvas id="tempChartCanvas" aria-label="Seven day high and low temperature chart"></canvas>
+    </div>
+    <p class="temp-modal-note">Highs and lows for the next 7 days, in your selected units.</p>
+  </div>
+
+  <!-- ================= A day in detail ================= -->
+  <!-- ================= Metric detail sheet =================
+
+       Every tile opens one of these: the metric charted across the
+       chosen day, past dashed and future solid, with a sentence
+       saying what the shape means. One panel serves every metric —
+       adding one is a definition in metricsheet.js, not a new box. -->
+  <div class="modal-overlay" id="metricSheetOverlay" hidden></div>
+  <section class="temp-modal metric-sheet" id="metricSheet" role="dialog"
+           aria-modal="true" aria-labelledby="sheetTitle" hidden>
+    <div class="temp-modal-head">
+      <div>
+        <h2 id="sheetTitle"></h2>
+        <p class="temp-modal-summary" id="sheetDate"></p>
+      </div>
+      <button type="button" id="metricSheetClose" class="btn btn-small"
+              aria-label="Close"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    </div>
+
+    <div class="sheet-dates" id="sheetDates" role="group" aria-label="Pick a day"></div>
+
+    <p class="sheet-value" id="sheetValue">--</p>
+    <p class="sheet-sub" id="sheetSub"></p>
+    <div class="sheet-legend" id="sheetLegend" hidden></div>
+
+    <div class="sheet-chart-wrap">
+      <canvas id="sheetChart" aria-label="Hour by hour for this day"></canvas>
+      <!-- Sheets whose facts are not a shape over the day use this
+           instead of the chart: sun times, moon phase, pollutants. -->
+      <dl class="sheet-rows" id="sheetRows" hidden></dl>
+      <p class="sheet-empty" id="sheetEmpty" hidden></p>
+    </div>
+
+    <p class="sheet-summary" id="sheetSummary"></p>
+  </section>
+
+  <div class="modal-overlay" id="dayModalOverlay" hidden></div>
+  <div class="temp-modal day-modal" id="dayModal" role="dialog" aria-modal="true"
+       aria-labelledby="dayModalTitle" tabindex="-1" hidden>
+    <div class="temp-modal-head">
+      <div>
+        <h2 id="dayModalTitle">Day</h2>
+        <p class="temp-modal-summary" id="dayModalSummary"></p>
+      </div>
+      <button type="button" id="dayModalClose" class="btn btn-small" aria-label="Close day"><span class="btn-ico" data-ui-icon="close" data-ui-size="15"></span></button>
+    </div>
+
+    <p class="day-roast" id="dayRoast"></p>
+
+    <div class="day-facts" id="dayFacts"></div>
+    <div class="day-hours-wrap">
+      <div class="day-hours" id="dayHours"></div>
+    </div>
+    <p class="temp-modal-note" id="dayHoursNote"></p>
+  </div>
+
+  <!-- ================= Toast ================= -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <footer class="app-footer">
+    <span>Aither Weather <span id="appVersionFooter">V13</span> ⚡🌩️ — data from the
+      <a href="https://www.weather.gov/documentation/services-web-api" target="_blank" rel="noopener">National Weather Service</a>
+      and <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, radar from
+      <a href="https://opengeo.ncep.noaa.gov/" target="_blank" rel="noopener">NOAA</a> — no API keys needed
+      · <a href="#" id="footerDownloadLink">Get the desktop app</a></span>
+  </footer>
+
+  <!-- Load order matters: config → storage → themes → AI → radar → app -->
+  <script src="config.js"></script>
+  <script src="icons.js"></script>
+  <script src="weatheranim.js"></script>
+  <script src="tiles.js"></script>
+  <script src="normals.js"></script>
+  <script src="gemini.js"></script>
+  <script src="metricsheet.js"></script>
+  <script src="desktop-extras.js"></script>
+  <script src="storage.js"></script>
+  <script src="themes.js"></script>
+  <script src="units.js"></script>
+  <script src="search.js"></script>
+  <script src="downloads.js"></script>
+  <script src="auth.js"></script>
+  <script src="nws.js"></script>
+  <script src="air.js"></script>
+  <script src="rain.js"></script>
+  <script src="precip.js"></script>
+  <script src="tempchart.js"></script>
+  <script src="compare.js"></script>
+  <script src="map.js"></script>
+  <script src="radarsource.js"></script>
+  <script src="hourly.js"></script>
+  <script src="share.js"></script>
+  <script src="local-ai.js"></script>
+  <script src="radar.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

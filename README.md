@@ -849,7 +849,7 @@ value in `config.js`, which is what the steps below do.
 1. Create an **OAuth 2.0 Client ID** (type: *Web application*) at
    [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
 2. Under **Authorised JavaScript origins**, add your site — for this project
-   that is `https://gwallee.github.io` (add `http://localhost:8000` too if you
+   that is `https://ogaithertech.github.io` (add `http://localhost:8000` too if you
    test locally)
 3. Paste it into `auth.google.clientId` in `config.js`
 
@@ -862,7 +862,7 @@ value in `config.js`, which is what the steps below do.
    `auth.microsoft.tenant` to `consumers` for personal only, or to a tenant ID
    to restrict sign-in to one organisation
 3. Add a **Single-page application** redirect URI matching the page itself —
-   `https://gwallee.github.io/What-The-Weather/` (and
+   `https://ogaithertech.github.io/WhatTheWether/` (and
    `http://localhost:8000/` for local testing). SPA, *not* Web: the Web type
    expects a client secret, which a static site cannot keep
 4. Paste the **Application (client) ID** into `auth.microsoft.clientId`
@@ -876,8 +876,8 @@ do not. Worth knowing before you start.
 1. In [Certificates, Identifiers & Profiles → Identifiers](https://developer.apple.com/account/resources/identifiers/list/serviceId),
    register an **App ID**, then a **Services ID** (that is the client ID)
 2. Enable **Sign in with Apple** on the Services ID and configure it: add your
-   domain (`gwallee.github.io`) and a **Return URL** matching the page exactly
-   — `https://gwallee.github.io/What-The-Weather/`
+   domain (`ogaithertech.github.io`) and a **Return URL** matching the page exactly
+   — `https://ogaithertech.github.io/WhatTheWether/`
 3. Paste the Services ID into `auth.apple.clientId`. If your Return URL differs
    from the page's own URL, set `auth.apple.redirectUri` to match it
 
@@ -1129,3 +1129,4 @@ add your own certificate.
 - Basemap tiles: [CARTO](https://carto.com/), data ©
   [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors
 - Roasts: generated locally by Wether Bot, who is very sorry (it is not)
+

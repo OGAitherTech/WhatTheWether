@@ -1,4 +1,4 @@
-# Aither Weather V29 ⚡🌩️
+# Aither Weather V30 ⚡🌩️
 
 A dark/neon weather web app with a **real radar over a real map**, a 48-hour
 outlook, 7-day forecasts, favorites, themes, offline support, and a built-in
@@ -10,6 +10,25 @@ connection.
 ![Aither Weather logo](logo.svg)
 
 ## Features
+
+### 🖥️ Desktop command centre (V30)
+
+The packaged app is now designed as a resident weather utility rather than a
+browser tab in a frame:
+
+- **Weather Glance** condenses the window to current conditions, alerts and the
+  hourly outlook, keeps it floating, and restores the full dashboard instantly.
+- **Command palette** (`Ctrl/⌘ K`) searches native actions: location, refresh,
+  settings, radar, glance mode and zoom.
+- **Global quick show/hide** (`Ctrl/⌘ Shift W`) brings the app back from anywhere.
+- **Native shortcuts and menus** control weather refresh, geolocation, fullscreen,
+  zoom and glance mode without reloading the page.
+- **Remembered window placement** restores size, position and maximized state,
+  while detecting monitors that are no longer connected.
+- The tray now opens search, refresh and Weather Glance directly.
+
+All commands cross the isolated preload as a fixed allow-list. The renderer
+still cannot access Node, paths, URLs, shell commands or arbitrary IPC channels.
 
 ### 📍 The forecast follows you (V29)
 
@@ -972,7 +991,7 @@ dependencies** — `package.json` exists only for the tests.
 ## Project structure
 
 ```
-AitherWeather-V29/
+AitherWeather-V30/
 ├── index.html      # App shell / markup
 ├── styles.css      # All styling + the three themes (CSS variables)
 ├── app.js          # Main app: search, weather, favorites, settings
@@ -1102,7 +1121,7 @@ on the **Build desktop apps** action) and GitHub builds all three platforms
 natively and attaches them to a release:
 
 ```bash
-git tag v29.0.0 && git push origin v29.0.0
+git tag v30.0.0 && git push origin v30.0.0
 ```
 
 | Platform | Files |

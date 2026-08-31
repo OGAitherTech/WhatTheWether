@@ -17,6 +17,9 @@
        alive and permission has been granted.
      - Window behaviour: always on top, launch at login, close to
        tray. None of these exist for a web page.
+     - A command palette, global quick-show shortcut and a compact
+       Weather Glance window for checking conditions without digging
+       through a browser tab.
 
    Everything here degrades to nothing. `window.aitherDesktop` is
    injected by the preload script; without it, every function below
@@ -140,7 +143,129 @@ const WTWDesktop = (() => {
     ['deskAlwaysOnTop', 'alwaysOnTop'],
     ['deskMinimiseToTray', 'minimiseToTray'],
     ['deskAutoUpdate', 'autoCheckUpdates'],
+    ['deskStartCompact', 'startCompact'],
   ];
+
+  /* ---------------- Command palette ---------------- */
+
+  const COMMANDS = [
+    ['search', 'Search for a place', 'Ctrl K'],
+    ['location', 'Use my location', 'Ctrl Shift L'],
+    ['refresh', 'Refresh weather', 'Ctrl R'],
+    ['compact', 'Toggle Weather Glance', 'Ctrl Shift G'],
+    ['settings', 'Open settings', ''],
+    ['radar', 'Jump to radar', ''],
+    ['zoom-in', 'Zoom in', 'Ctrl +'],
+    ['zoom-out', 'Zoom out', 'Ctrl -'],
+    ['zoom-reset', 'Reset zoom', 'Ctrl 0'],
+  ];
+
+  function runCommand(command) {
+    const api = bridge();
+    const click = (id) => {
+      const el = document.getElementById(id);
+      if (el) el.click();
+    };
+    if (command === 'search') {
+      closePalette();
+      const input = document.getElementById('searchInput');
+      if (input) { input.focus(); input.select(); }
+      return;
+    }
+    if (command === 'location') click('geoBtn');
+    if (command === 'refresh') click('refreshBtn');
+    if (command === 'settings') click('settingsBtn');
+    if (command === 'radar') {
+      const radar = document.getElementById('radarCard');
+      if (radar) radar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (command === 'compact' && api) api.window.toggleCompact();
+    if (command === 'zoom-in' && api) api.window.zoomIn();
+    if (command === 'zoom-out' && api) api.window.zoomOut();
+    if (command === 'zoom-reset' && api) api.window.zoomReset();
+    closePalette();
+  }
+
+  function ensurePalette() {
+    let palette = document.getElementById('desktopCommandPalette');
+    if (palette) return palette;
+    palette = document.createElement('div');
+    palette.id = 'desktopCommandPalette';
+    palette.className = 'desktop-command-overlay';
+    palette.hidden = true;
+    palette.innerHTML = `
+      <section class="desktop-command-palette" role="dialog" aria-modal="true"
+               aria-labelledby="desktopCommandTitle">
+        <h2 id="desktopCommandTitle" class="sr-only">Desktop commands</h2>
+        <input id="desktopCommandInput" type="search" autocomplete="off"
+               placeholder="Type a command…" aria-label="Filter desktop commands" />
+        <div class="desktop-command-list" role="listbox"></div>
+        <p class="desktop-command-hint">↑↓ choose · Enter run · Esc close · global show/hide: Ctrl Shift W</p>
+      </section>`;
+    document.body.appendChild(palette);
+    const input = palette.querySelector('input');
+    input.addEventListener('input', renderPaletteCommands);
+    palette.addEventListener('keydown', (event) => {
+      const buttons = [...palette.querySelectorAll('.desktop-command-item:not([hidden])')];
+      let index = buttons.indexOf(document.activeElement);
+      if (event.key === 'Escape') { event.preventDefault(); closePalette(); }
+      if (event.key === 'ArrowDown' && buttons.length) {
+        event.preventDefault(); buttons[(index + 1) % buttons.length].focus();
+      }
+      if (event.key === 'ArrowUp' && buttons.length) {
+        event.preventDefault(); buttons[(index < 0 ? buttons.length - 1 : index - 1 + buttons.length) % buttons.length].focus();
+      }
+      if (event.key === 'Enter' && buttons.length) {
+        event.preventDefault(); buttons[Math.max(0, index)].click();
+      }
+    });
+    palette.addEventListener('click', (event) => {
+      if (event.target === palette) closePalette();
+    });
+    renderPaletteCommands();
+    return palette;
+  }
+
+  function renderPaletteCommands() {
+    const palette = ensurePalette();
+    const list = palette.querySelector('.desktop-command-list');
+    const query = palette.querySelector('input').value.trim().toLowerCase();
+    list.replaceChildren();
+    COMMANDS.filter(([, label]) => !query || label.toLowerCase().includes(query))
+      .forEach(([command, label, shortcut]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'desktop-command-item';
+        button.dataset.command = command;
+        button.setAttribute('role', 'option');
+        button.innerHTML = `<span>${label}</span><kbd>${shortcut}</kbd>`;
+        button.addEventListener('click', () => runCommand(command));
+        list.appendChild(button);
+      });
+  }
+
+  function openPalette() {
+    const palette = ensurePalette();
+    palette.hidden = false;
+    const input = palette.querySelector('input');
+    input.value = '';
+    renderPaletteCommands();
+    input.focus();
+  }
+
+  function closePalette() {
+    const palette = document.getElementById('desktopCommandPalette');
+    if (palette) palette.hidden = true;
+  }
+
+  function receiveCommand(command) {
+    if (command === 'palette') return openPalette();
+    if (command === 'compact-on' || command === 'compact-off') {
+      document.documentElement.dataset.desktopGlance = command === 'compact-on' ? 'true' : 'false';
+      return;
+    }
+    runCommand(command);
+  }
 
   function bindPrefs() {
     const api = bridge();
@@ -180,11 +305,18 @@ const WTWDesktop = (() => {
     const button = document.getElementById('desktopUpdateBtn');
     if (button) button.addEventListener('click', actOnUpdate);
     api.on('update-status', renderUpdate);
+    api.on('desktop-command', receiveCommand);
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault(); openPalette();
+      }
+      if (event.key === 'Escape') closePalette();
+    });
     renderUpdate(await api.updates.state());
   }
 
   return { init, available, pushWeather, pushAlerts, checkUpdates, renderUpdate,
-           lastPush: () => lastPush };
+           runCommand, openPalette, lastPush: () => lastPush };
 })();
 
 window.WTWDesktop = WTWDesktop;

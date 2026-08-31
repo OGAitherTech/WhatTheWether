@@ -1,5 +1,5 @@
 /* ============================================================
-   Aither Weather V29 — app.js
+   Aither Weather V30 — app.js
    Search, weather (NWS primary + Open-Meteo companion), hourly
    outlook, alerts, radar wiring, favorites, settings, roasts,
    offline snapshot, and PWA registration.

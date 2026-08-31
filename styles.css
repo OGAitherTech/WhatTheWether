@@ -2461,6 +2461,78 @@ body.radar-fullscreen { overflow: hidden; }
   text-align: center;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------------- Desktop command centre ---------------- */
+
+.desktop-command-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  padding: min(14vh, 110px) 1rem 1rem;
+  background: rgba(2, 6, 14, 0.62);
+  backdrop-filter: blur(10px);
+}
+.desktop-command-overlay[hidden] { display: none; }
+.desktop-command-palette {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), var(--glow);
+}
+#desktopCommandInput {
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 0;
+  border-bottom: 1px solid var(--card-border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 1.05rem;
+  outline: none;
+}
+.desktop-command-list { max-height: 390px; overflow: auto; padding: 0.45rem; }
+.desktop-command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.72rem 0.8rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.desktop-command-item:hover,
+.desktop-command-item:focus { background: var(--btn-hover); outline: none; }
+.desktop-command-item kbd {
+  color: var(--text-dim);
+  font: 0.7rem/1.4 var(--font-mono, monospace);
+}
+.desktop-command-hint {
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--card-border);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+/* Weather Glance is a real compact desktop surface, not a scaled-down
+   screenshot of the whole dashboard. Keep the urgent and glanceable
+   pieces; the command palette can restore the full window instantly. */
+[data-desktop-glance="true"] .app-header .brand-text,
+[data-desktop-glance="true"] .app-header .search-field,
+[data-desktop-glance="true"] .app-header #downloadBtn,
+[data-desktop-glance="true"] .app-header #accountBtn,
+[data-desktop-glance="true"] .app-main > :not(.offline-banner):not(.alerts-panel):not(.hero):not(.hourly-card),
+[data-desktop-glance="true"] .site-footer { display: none !important; }
+[data-desktop-glance="true"] .app-header { position: static; padding: 0.55rem 0.7rem; }
+[data-desktop-glance="true"] .brand-logo { width: 34px; height: 34px; }
+[data-desktop-glance="true"] .app-main { display: block; padding: 0.75rem; }
+[data-desktop-glance="true"] .hero { min-height: 250px; margin-bottom: 0.75rem; }
+[data-desktop-glance="true"] .hourly-card { margin: 0; }
 .toast.error { border-color: var(--danger); }
 
 /* ---------------- Footer ---------------- */

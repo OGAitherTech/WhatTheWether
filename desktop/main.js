@@ -7,7 +7,7 @@
    ============================================================ */
 
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain,
-        Tray, nativeImage, Notification } = require('electron');
+        Tray, nativeImage, Notification, globalShortcut, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -50,6 +50,8 @@ function appRoot() {
 
 let mainWindow = null;
 let tray = null;
+let normalBounds = null;
+let saveBoundsTimer = null;
 
 /* Desktop-only preferences, kept beside the app's own data rather
    than in the page's localStorage: they describe the window and the
@@ -61,7 +63,62 @@ const DEFAULT_PREFS = {
   alwaysOnTop: false,
   minimiseToTray: false,
   autoCheckUpdates: true,
+  startCompact: false,
 };
+
+const WINDOW_STATE_FILE = () => path.join(app.getPath('userData'), 'window-state.json');
+
+function readWindowState() {
+  try { return JSON.parse(fs.readFileSync(WINDOW_STATE_FILE(), 'utf8')); }
+  catch (_) { return {}; }
+}
+
+function saveWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isCompactMode || mainWindow.isMinimized() ||
+      mainWindow.isFullScreen() || mainWindow.webContents.getZoomFactor() !== 1) return;
+  const state = { bounds: mainWindow.getBounds(), maximized: mainWindow.isMaximized() };
+  try { fs.writeFileSync(WINDOW_STATE_FILE(), JSON.stringify(state)); }
+  catch (err) { log.warn('could not save window state', err && err.message); }
+}
+
+function visibleBounds(candidate) {
+  if (!candidate || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) return null;
+  const displays = screen.getAllDisplays();
+  const visible = displays.some(({ workArea }) =>
+    candidate.x < workArea.x + workArea.width && candidate.x + candidate.width > workArea.x &&
+    candidate.y < workArea.y + workArea.height && candidate.y + candidate.height > workArea.y);
+  return visible ? candidate : null;
+}
+
+function sendCommand(command) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('desktop-command', command);
+}
+
+function showMainWindow() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleCompact(force) {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const next = typeof force === 'boolean' ? force : !mainWindow.isCompactMode;
+  if (next === !!mainWindow.isCompactMode) return next;
+  if (next) {
+    normalBounds = mainWindow.getBounds();
+    mainWindow.setMinimumSize(360, 500);
+    mainWindow.setBounds(Object.assign({}, normalBounds, { width: 430, height: 720 }));
+    mainWindow.setAlwaysOnTop(true, 'floating');
+  } else {
+    mainWindow.setAlwaysOnTop(!!readPrefs().alwaysOnTop);
+    if (normalBounds) mainWindow.setBounds(normalBounds);
+  }
+  mainWindow.isCompactMode = next;
+  sendCommand(next ? 'compact-on' : 'compact-off');
+  return next;
+}
 
 function readPrefs() {
   try {
@@ -100,9 +157,12 @@ function applyPrefs(prefs) {
 }
 
 function createWindow() {
+  const saved = readWindowState();
+  const bounds = visibleBounds(saved.bounds);
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 900,
+    width: bounds ? bounds.width : 1280,
+    height: bounds ? bounds.height : 900,
+    ...(bounds ? { x: bounds.x, y: bounds.y } : {}),
     minWidth: 360,
     minHeight: 560,
     backgroundColor: '#0a0e17',
@@ -118,7 +178,11 @@ function createWindow() {
   });
 
   // Avoid a white flash before the dark UI paints.
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    if (saved.maximized) mainWindow.maximize();
+    mainWindow.show();
+    if (readPrefs().startCompact) toggleCompact(true);
+  });
   mainWindow.loadFile(path.join(appRoot(), 'index.html'));
 
   // External links open in the real browser, never in the app frame.
@@ -134,6 +198,12 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => { mainWindow = null; });
+  const scheduleSaveBounds = () => {
+    clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(saveWindowState, 250);
+  };
+  mainWindow.on('resize', scheduleSaveBounds);
+  mainWindow.on('move', scheduleSaveBounds);
 
   // Closing to the tray is a desktop habit; it is off unless asked for.
   mainWindow.on('close', (event) => {
@@ -209,7 +279,10 @@ function ensureTray() {
     else { mainWindow.show(); mainWindow.focus(); }
   });
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Show Aither Weather', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+    { label: 'Show Aither Weather', click: showMainWindow },
+    { label: 'Weather Glance', click: () => { showMainWindow(); toggleCompact(); } },
+    { label: 'Search for a Place…', click: () => { showMainWindow(); sendCommand('search'); } },
+    { label: 'Refresh Weather', click: () => sendCommand('refresh') },
     { label: 'Check for Updates…', click: () => checkForUpdates({ silent: false }) },
     { type: 'separator' },
     { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } },
@@ -273,6 +346,23 @@ function wireIpc() {
     new Notification({ title, body, silent: false }).show();
     return true;
   });
+
+  ipcMain.handle('window:command', (_e, command) => {
+    const allowed = new Set(['show', 'hide', 'toggle-compact', 'toggle-maximize',
+                             'zoom-in', 'zoom-out', 'zoom-reset']);
+    if (!allowed.has(command) || !mainWindow) return false;
+    if (command === 'show') showMainWindow();
+    if (command === 'hide') mainWindow.hide();
+    if (command === 'toggle-compact') return toggleCompact();
+    if (command === 'toggle-maximize') {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
+    }
+    const wc = mainWindow.webContents;
+    if (command === 'zoom-in') wc.setZoomFactor(Math.min(1.5, wc.getZoomFactor() + 0.1));
+    if (command === 'zoom-out') wc.setZoomFactor(Math.max(0.7, wc.getZoomFactor() - 0.1));
+    if (command === 'zoom-reset') wc.setZoomFactor(1);
+    return true;
+  });
 }
 
 function buildMenu() {
@@ -285,7 +375,22 @@ function buildMenu() {
         {
           label: 'Refresh Weather',
           accelerator: 'CmdOrCtrl+R',
-          click: () => mainWindow && mainWindow.reload(),
+          click: () => sendCommand('refresh'),
+        },
+        {
+          label: 'Search for a Place…',
+          accelerator: 'CmdOrCtrl+K',
+          click: () => sendCommand('palette'),
+        },
+        {
+          label: 'Use My Location',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: () => sendCommand('location'),
+        },
+        {
+          label: 'Weather Glance',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => toggleCompact(),
         },
         {
           label: 'Toggle Fullscreen',
@@ -300,7 +405,9 @@ function buildMenu() {
     {
       label: 'View',
       submenu: [
-        { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+        { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => mainWindow && mainWindow.webContents.setZoomFactor(1) },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => mainWindow && mainWindow.webContents.setZoomFactor(Math.min(1.5, mainWindow.webContents.getZoomFactor() + 0.1)) },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => mainWindow && mainWindow.webContents.setZoomFactor(Math.max(0.7, mainWindow.webContents.getZoomFactor() - 0.1)) },
         { type: 'separator' }, { role: 'toggleDevTools' },
       ],
     },
@@ -341,8 +448,7 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+      showMainWindow();
     }
   });
 
@@ -351,6 +457,12 @@ if (!gotLock) {
     wireIpc();
     buildMenu();
     createWindow();
+    const registered = globalShortcut.register('CommandOrControl+Shift+W', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible() && mainWindow.isFocused()) mainWindow.hide();
+      else showMainWindow();
+    });
+    if (!registered) log.warn('global quick-show shortcut unavailable');
     if (readPrefs().trayWeather) ensureTray();
     // One check a few seconds after launch, once the window has
     // settled and the weather is already on screen.
@@ -362,6 +474,7 @@ if (!gotLock) {
 }
 
 app.on('before-quit', () => { app.isQuitting = true; });
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

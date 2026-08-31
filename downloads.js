@@ -1,5 +1,5 @@
 /* ============================================================
-   Aither Weather V29 — downloads.js
+   Aither Weather V30 — downloads.js
    Lists the desktop builds from the project's latest GitHub
    release, so the website can hand out the real files.
 

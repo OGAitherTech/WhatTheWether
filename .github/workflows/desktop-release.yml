@@ -2,12 +2,8 @@ name: Build desktop apps
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
-    paths:
-      - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
     inputs:
       tag:
@@ -71,8 +67,8 @@ jobs:
       - name: Publish installers and update feeds
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v31.0.0' }}
-          name: Aither Weather ${{ github.event_name == 'workflow_dispatch' && inputs.tag || startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v31.0.0' }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: Aither Weather ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: release-assets/*
 

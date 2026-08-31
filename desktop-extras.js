@@ -53,6 +53,8 @@ const WTWDesktop = (() => {
     const status = document.getElementById('desktopUpdateStatus');
     const button = document.getElementById('desktopUpdateBtn');
     const bar = document.getElementById('desktopUpdateBar');
+    const notes = document.getElementById('desktopReleaseNotes');
+    const notesText = document.getElementById('desktopReleaseNotesText');
     const s = state || { status: 'idle' };
 
     let text = WORDS[s.status] || '';
@@ -68,13 +70,19 @@ const WTWDesktop = (() => {
       bar.style.setProperty('--pct', `${s.progress || 0}%`);
     }
 
+    if (notes && notesText) {
+      const showNotes = !!s.notes && ['available', 'downloading', 'ready'].includes(s.status);
+      notes.hidden = !showNotes;
+      notesText.textContent = showNotes ? s.notes : '';
+    }
+
     if (button) {
       const labels = {
         available: 'Download it',
         ready: 'Restart and install',
         downloading: 'Downloading…',
       };
-      button.textContent = labels[s.status] || 'Check for updates';
+      button.textContent = labels[s.status] || (s.status === 'error' ? 'Try again' : 'Check for updates');
       button.disabled = s.status === 'checking' || s.status === 'downloading';
     }
   }

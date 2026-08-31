@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0e17" />
-  <meta name="description" content="Aither Weather V30 — a desktop-first neon weather app with native commands, Weather Glance, a fullscreen animated radar, forecasts, alerts, offline support, and a local AI. No API keys required." />
-  <title>Aither Weather V30 ⚡🌩️</title>
+  <meta name="description" content="Aither Weather V31 — a self-updating desktop-first weather app with native commands, Weather Glance, radar, forecasts, alerts, offline support, and a local AI. No API keys required." />
+  <title>Aither Weather V31 ⚡🌩️</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="manifest" href="manifest.json" />
@@ -680,6 +680,10 @@
         <div id="desktopUpdate">
           <p class="setting-status" id="desktopUpdateStatus"></p>
           <div class="update-bar" id="desktopUpdateBar" hidden><span></span></div>
+          <details class="desktop-release-notes" id="desktopReleaseNotes" hidden>
+            <summary>What changed</summary>
+            <p id="desktopReleaseNotesText"></p>
+          </details>
         </div>
         <button type="button" id="desktopUpdateBtn" class="btn btn-small">Check for updates</button>
       </div>

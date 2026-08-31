@@ -28,13 +28,75 @@ log.transports.file.level = 'info';
    it asks first, and it only asks once per launch. */
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.allowPrerelease = false;
 
-let updateState = { status: 'idle', version: null, notes: null, progress: 0 };
+let updateState = { status: 'idle', version: null, notes: null, progress: 0,
+                    currentVersion: null, checkedAt: null };
+let promptedVersion = null;
+let readyPromptedVersion = null;
+let periodicUpdateTimer = null;
 
 function setUpdateState(patch) {
   updateState = Object.assign({}, updateState, patch);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update-status', updateState);
+    if (updateState.status === 'downloading') {
+      mainWindow.setProgressBar(Math.max(0, Math.min(1, (updateState.progress || 0) / 100)));
+    } else {
+      mainWindow.setProgressBar(-1);
+    }
+  }
+}
+
+function releaseNotes(info) {
+  const notes = info && info.releaseNotes;
+  if (typeof notes === 'string') return notes.slice(0, 4000);
+  if (Array.isArray(notes)) {
+    return notes.map((item) => typeof item === 'string' ? item : item && item.note)
+      .filter(Boolean).join('\n\n').slice(0, 4000);
+  }
+  return null;
+}
+
+async function promptForAvailableUpdate(info) {
+  const version = String((info && info.version) || 'new');
+  if (!mainWindow || promptedVersion === version) return;
+  promptedVersion = version;
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Aither Weather update available',
+    message: `Aither Weather ${version} is available.`,
+    detail: `${releaseNotes(info) || 'A newer desktop version is ready.'}\n\n` +
+            'Download it now? Installation waits until you approve the restart.',
+    buttons: ['Download update', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (result.response === 0) {
+    setUpdateState({ status: 'downloading', progress: 0 });
+    try { await autoUpdater.downloadUpdate(); }
+    catch (err) { setUpdateState({ status: 'error', notes: String(err && err.message) }); }
+  }
+}
+
+async function promptForReadyUpdate(info) {
+  const version = String((info && info.version) || updateState.version || 'new');
+  if (!mainWindow || readyPromptedVersion === version) return;
+  readyPromptedVersion = version;
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Update ready',
+    message: `Aither Weather ${version} is ready to install.`,
+    detail: 'Restart now to finish the update, or keep using the app and install when you quit.',
+    buttons: ['Restart and install', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (result.response === 0) {
+    app.isQuitting = true;
+    setImmediate(() => autoUpdater.quitAndInstall());
   }
 }
 
@@ -223,23 +285,35 @@ function createWindow() {
    ============================================================ */
 
 function wireUpdater() {
+  setUpdateState({ currentVersion: app.getVersion() });
   autoUpdater.on('checking-for-update', () => setUpdateState({ status: 'checking' }));
   autoUpdater.on('update-available', (info) => {
     setUpdateState({ status: 'available', version: info && info.version,
-                     notes: typeof (info && info.releaseNotes) === 'string'
-                       ? info.releaseNotes.slice(0, 2000) : null });
+                     notes: releaseNotes(info), checkedAt: new Date().toISOString() });
+    promptForAvailableUpdate(info);
   });
-  autoUpdater.on('update-not-available', () => setUpdateState({ status: 'current' }));
+  autoUpdater.on('update-not-available', () =>
+    setUpdateState({ status: 'current', checkedAt: new Date().toISOString() }));
   autoUpdater.on('download-progress', (p) =>
     setUpdateState({ status: 'downloading', progress: Math.round(p.percent || 0) }));
-  autoUpdater.on('update-downloaded', (info) =>
-    setUpdateState({ status: 'ready', version: info && info.version, progress: 100 }));
+  autoUpdater.on('update-downloaded', (info) => {
+    setUpdateState({ status: 'ready', version: info && info.version, progress: 100 });
+    promptForReadyUpdate(info);
+  });
   autoUpdater.on('error', (err) => {
     // An update that cannot be checked is not a reason to interrupt
     // somebody looking at the weather.
     log.warn('update check failed', err && err.message);
     setUpdateState({ status: 'error', notes: String((err && err.message) || err) });
   });
+}
+
+function scheduleUpdateChecks() {
+  clearInterval(periodicUpdateTimer);
+  if (!readPrefs().autoCheckUpdates) return;
+  // Re-check while the app remains resident in the tray. Four hours
+  // catches a release promptly without turning GitHub into a polling service.
+  periodicUpdateTimer = setInterval(() => checkForUpdates(), 4 * 60 * 60 * 1000);
 }
 
 async function checkForUpdates({ silent = true } = {}) {
@@ -322,6 +396,7 @@ function wireIpc() {
     }
     const next = writePrefs(clean);
     if (next.trayWeather) ensureTray();
+    scheduleUpdateChecks();
     return next;
   });
 
@@ -467,6 +542,7 @@ if (!gotLock) {
     // One check a few seconds after launch, once the window has
     // settled and the weather is already on screen.
     if (readPrefs().autoCheckUpdates) setTimeout(() => checkForUpdates(), 6000);
+    scheduleUpdateChecks();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -474,7 +550,10 @@ if (!gotLock) {
 }
 
 app.on('before-quit', () => { app.isQuitting = true; });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  clearInterval(periodicUpdateTimer);
+  globalShortcut.unregisterAll();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

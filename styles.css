@@ -2519,6 +2519,14 @@ body.radar-fullscreen { overflow: hidden; }
   font-size: 0.7rem;
 }
 
+.desktop-release-notes {
+  margin-top: 0.55rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+.desktop-release-notes summary { color: var(--accent); cursor: pointer; }
+.desktop-release-notes p { margin-top: 0.4rem; white-space: pre-wrap; }
+
 /* Weather Glance is a real compact desktop surface, not a scaled-down
    screenshot of the whole dashboard. Keep the urgent and glanceable
    pieces; the command palette can restore the full window instantly. */

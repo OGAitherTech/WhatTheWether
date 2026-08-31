@@ -1,5 +1,5 @@
 /* ============================================================
-   Aither Weather V30 — rain.js
+   Aither Weather V31 — rain.js
    Picks the most authoritative precipitation source available and
    says which one answered.
 

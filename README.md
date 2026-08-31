@@ -1,4 +1,4 @@
-# Aither Weather V30 ⚡🌩️
+# Aither Weather V31 ⚡🌩️
 
 A dark/neon weather web app with a **real radar over a real map**, a 48-hour
 outlook, 7-day forecasts, favorites, themes, offline support, and a built-in
@@ -10,6 +10,18 @@ connection.
 ![Aither Weather logo](logo.svg)
 
 ## Features
+
+### 🔄 Updates that belong inside the app (V31)
+
+The desktop app now owns the full update lifecycle. It checks shortly after
+launch and every four hours while resident in the tray, presents release notes
+before downloading, and asks before both the download and restart. Progress is
+shown in Settings and on the operating system's taskbar or dock. A failed check
+stays non-blocking and offers a clear retry; a downloaded update can wait until
+quit without interrupting the forecast.
+
+The updater remains deliberately conservative: stable releases only, no silent
+downloads, and installation only after explicit approval.
 
 ### 🖥️ Desktop command centre (V30)
 
@@ -991,7 +1003,7 @@ dependencies** — `package.json` exists only for the tests.
 ## Project structure
 
 ```
-AitherWeather-V30/
+AitherWeather-V31/
 ├── index.html      # App shell / markup
 ├── styles.css      # All styling + the three themes (CSS variables)
 ├── app.js          # Main app: search, weather, favorites, settings
@@ -1121,7 +1133,7 @@ on the **Build desktop apps** action) and GitHub builds all three platforms
 natively and attaches them to a release:
 
 ```bash
-git tag v30.0.0 && git push origin v30.0.0
+git tag v31.0.0 && git push origin v31.0.0
 ```
 
 | Platform | Files |

@@ -1,6 +1,6 @@
 # Aither Weather — handoff
 
-**Version:** V30 · **Stack:** vanilla JS + Electron, no browser build step, no API keys
+**Version:** V31 · **Stack:** vanilla JS + Electron, no browser build step, no API keys
 **Repo:** `OGAitherTech/WhatTheWether` (`main`)
 **Tests:** 763 checks across 28 Playwright suites, all green at the time of writing
 
@@ -122,7 +122,7 @@ path, a URL or a command from the page.
 ### Cutting a release
 
 ```bash
-git tag v30.0.0 && git push origin v30.0.0
+git tag v31.0.0 && git push origin v31.0.0
 ```
 
 The `desktop-release.yml` workflow builds Windows, macOS and Linux, and publishes

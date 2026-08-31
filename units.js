@@ -1,5 +1,5 @@
 /* ============================================================
-   Aither Weather V30 — units.js
+   Aither Weather V31 — units.js
    One place that turns canonical values into display strings.
 
    Everything inside the app stays in a single canonical set —

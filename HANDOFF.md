@@ -1,7 +1,7 @@
 # Aither Weather — handoff
 
-**Version:** V28 · **Stack:** vanilla JS, no build step, no API keys
-**Repos:** `gwallee/Fanuc` (branch `claude/what-the-wether-v8-3a1l7b`) · `gwallee/What-The-Weather` (`main`, live site)
+**Version:** V29 · **Stack:** vanilla JS, no build step, no API keys
+**Repo:** `OGAitherTech/WhatTheWether` (`main`)
 **Tests:** 763 checks across 28 Playwright suites, all green at the time of writing
 
 ---
@@ -122,7 +122,7 @@ path, a URL or a command from the page.
 ### Cutting a release
 
 ```bash
-git tag v28.0.0 && git push origin v28.0.0
+git tag v29.0.0 && git push origin v29.0.0
 ```
 
 The `desktop-release.yml` workflow builds Windows, macOS and Linux, and publishes
@@ -166,9 +166,8 @@ version N added, and older suites are the regression net.
 
 ## If you pick this up next
 
-1. **Cut `v28.0.0` and confirm the first real desktop update.** That is the
-   single biggest unverified path.
+1. **Confirm the V28 → V29 update in an installed desktop copy.** The release
+   feeds are published, but the in-app replacement path still needs a real run.
 2. **Try Gemini in a real browser.** If it fails, the service worker serving a
    stale shell is the first suspect — Settings → Force update.
-3. The sticky condensed header from Apple's app (city + temp pinned while you
-   scroll) is the most obvious remaining visual gap.
+3. Consider adding a compact severe-alert indicator to the condensed header.

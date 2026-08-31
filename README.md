@@ -1,4 +1,4 @@
-# Aither Weather V28 ⚡🌩️
+# Aither Weather V29 ⚡🌩️
 
 A dark/neon weather web app with a **real radar over a real map**, a 48-hour
 outlook, 7-day forecasts, favorites, themes, offline support, and a built-in
@@ -10,6 +10,16 @@ connection.
 ![Aither Weather logo](logo.svg)
 
 ## Features
+
+### 📍 The forecast follows you (V29)
+
+Once the full current-conditions hero scrolls away, the sticky header condenses
+to the city and current temperature. Search and the primary controls remain
+reachable, while the duplicate weather text stays out of the accessibility tree.
+
+Desktop downloads and automatic updates now come from the canonical
+`OGAitherTech/WhatTheWether` releases. Windows, macOS and Linux packages are
+built natively by GitHub Actions and published with the updater metadata.
 
 ### 🔎 Search that shows you the choices
 Through V12 the box silently took the first geocoding hit, so
@@ -962,7 +972,7 @@ dependencies** — `package.json` exists only for the tests.
 ## Project structure
 
 ```
-AitherWeather-V28/
+AitherWeather-V29/
 ├── index.html      # App shell / markup
 ├── styles.css      # All styling + the three themes (CSS variables)
 ├── app.js          # Main app: search, weather, favorites, settings
@@ -1092,7 +1102,7 @@ on the **Build desktop apps** action) and GitHub builds all three platforms
 natively and attaches them to a release:
 
 ```bash
-git tag v28.0.0 && git push origin v28.0.0
+git tag v29.0.0 && git push origin v29.0.0
 ```
 
 | Platform | Files |
@@ -1129,4 +1139,3 @@ add your own certificate.
 - Basemap tiles: [CARTO](https://carto.com/), data ©
   [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors
 - Roasts: generated locally by Wether Bot, who is very sorry (it is not)
-
